@@ -2,7 +2,7 @@
 
 目前进度:
 
-osu-api-v1 60%
+osu-api-v1 100%? (若有遗漏可以pr~)
 
 osu-api-v2 0% (不使用oauth,直接临时)
 

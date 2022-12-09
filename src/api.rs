@@ -2,19 +2,19 @@ use std::process::id;
 use reqwest::Client;
 use serde_json::{json, Value};
 use serde_json::error::Category::Data;
-use crate::entity::{Beatmap, GameRecord, Games, MatchRoom, Scores, User};
+use crate::entity::{Beatmap, GameRecord, Games, MatchRoom, Replay, Scores, User};
 /// 父url
 pub static OSU_API_1: &'static str = "https://osu.ppy.sh/api";
 pub static OSU_API_2: &'static str = "https://osu.ppy.sh/oauth/token";
 /// 获取数据 osu_api_v1 用的get
-async fn get_1(url: String) -> String {
+async fn get(url: String) -> String {
     let string = format!("{}{}", OSU_API_1, url);
     let data = reqwest::get(string).await;
     let response = data.unwrap();
     response.text().await.unwrap_or(String::from(""))
 }
 /// 获取数据 osu_api_v2 用的post
-async fn get_2(url: &str,json:Value) -> String {
+async fn post(url: &str,json:Value) -> String {
     let data = reqwest::get(format!("{}{}",OSU_API_2,url)).await;
     let response = data.unwrap();
     response.text().await.unwrap_or(String::from(""))
@@ -136,7 +136,7 @@ impl ApiV1 {
         } else {
             vec.push(("a", DataType::Int8(Some(0))));
         }
-        let data = get_1(format!("/get_beatmaps?k={}{}", self.api_key,url(vec))).await;
+        let data = get(format!("/get_beatmaps?k={}{}", self.api_key, url(vec))).await;
         data_serialize_vec(data)
     }
     /// 使用 beatmap_id 获取铺面信息
@@ -209,7 +209,7 @@ impl ApiV1 {
                 }
             }
         };
-        let data = get_1(format!("/get_user?k={}{}", self.api_key,url(vec))).await;
+        let data = get(format!("/get_user?k={}{}", self.api_key, url(vec))).await;
         let serialize_vec:Vec<User> = data_serialize_vec(data);
         serialize_vec[0].clone()
     }
@@ -267,7 +267,7 @@ impl ApiV1 {
                 ]
             }
         };
-        let data = get_1(format!("/get_scores?k={}{}", self.api_key,url(vec))).await;
+        let data = get(format!("/get_scores?k={}{}", self.api_key, url(vec))).await;
         data_serialize_vec(data)
     }
     pub async fn get_score(
@@ -323,7 +323,7 @@ impl ApiV1 {
                 ]
             }
         };
-        let data = get_1(format!("/get_user_best?k={}{}", self.api_key,url(vec))).await;
+        let data = get(format!("/get_user_best?k={}{}", self.api_key, url(vec))).await;
         data_serialize_vec(data)
     }
     /// 获取指定 Bp
@@ -367,7 +367,7 @@ impl ApiV1 {
                 ]
             }
         };
-        let data = get_1(format!("/get_user_recent?k={}{}", self.api_key,url(vec))).await;
+        let data = get(format!("/get_user_recent?k={}{}", self.api_key, url(vec))).await;
         data_serialize_vec(data)
     }
     /// 获取最新游戏记录,(包括失败)?
@@ -408,7 +408,7 @@ impl ApiV1 {
         let vec = vec![
             ("mp", DataType::Int64(mp_id))
         ];
-        let data = get_1(format!("/get_match?k={}{}", self.api_key,url(vec))).await;
+        let data = get(format!("/get_match?k={}{}", self.api_key, url(vec))).await;
         data_serialize(data)
     }
     /// 获取mp最新的成绩
@@ -418,6 +418,43 @@ impl ApiV1 {
     ) -> Games {
         let match_room = self.get_match(mp_id).await;
         match_room.games.get(match_room.games.len() - 1).unwrap().clone()
+    }
+    /// # /api/get_replay
+    /// # 获取回放
+    /// 引用: https://docs.osuwiki.cn/jin-jie-zhi-lu/wei-rao-osu-kaifa#5.1.7-huo-qu-hui-fang
+    /// # 参数
+    ///* k - api key （必须）
+    ///* m - 模式 (0 = osu!, 1 = Taiko, 2 = CtB, 3 = osu!mania)，默认为0。（必须）
+    ///* b - 指定谱面id（注意！不是BeatmapSet ID，也就是说不是/s/xxxxx而是/b/xxxxx）（必须）
+    ///* u - 指定玩家。（必须）
+    ///
+    /// 返回值：一个包含"content"值的JSON列表，该值中含有base-64加密的rep。
+    pub async fn get_replay(
+        &self,
+        mode:Option<i8>,
+        beatmap_id:Option<i64>,
+        user:UserType<'_>,
+    ) -> Replay {
+       let vec =  match user {
+            UserType::USERID(id) => {
+                vec![
+                    ("m",DataType::Int8(mode)),
+                    ("b",DataType::Int64(beatmap_id)),
+                    ("u",DataType::Int64(Some(id))),
+                    ("type",DataType::String(Some("id"))),
+                ]
+            }
+            UserType::USERNAME(name) => {
+                vec![
+                    ("m",DataType::Int8(mode)),
+                    ("b",DataType::Int64(beatmap_id)),
+                    ("u",DataType::String(Some(name))),
+                    ("type",DataType::String(Some("string"))),
+                ]
+            }
+        };
+        let data = get(format!("/get_replay?k={}{}", self.api_key, url(vec))).await;
+        data_serialize(data)
     }
 
 }

@@ -255,3 +255,8 @@ pub struct RoomScores {
     pub pass :String,
     pub enabled_mods :Option<String>,
 }
+#[derive(Debug, Clone,serde::Serialize,serde::Deserialize)]
+pub struct Replay {
+    pub content :String,
+    pub encoding :String,
+}
