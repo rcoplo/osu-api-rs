@@ -3,42 +3,43 @@
 ///
 ///数据以下面结构体为准
 /// ```  json
-///
 /// [
-/// // 4 = loved, 3 = qualified, 2 = approved, 1 = ranked, 0 = pending, -1 = WIP, -2 = graveyard
-/// {"approved" : "1",
-///  // ranked日期, 时区为UTC+8
-/// "approved_date" : "2013-07-02 01:01:12",
-/// // 最后更新日期，时区同上。 如果谱面被Unranked之后Reranked，该日期可能晚于上面的日期。
-///  "last_update" : "2013-07-06 16:51:22",
-///  "artist" : "Luxion",
-///  "beatmap_id" : "252002", // 每个难度的Beatmap_ID
-///  "beatmapset_id" : "93398", // 所有难度的BeatmapSet_ID
-///  "bpm" : "196",
-///  "creator" : "RikiH_",
-///  "difficultyrating" : "5.59516", // 游戏中和网站上的难度星数
-/// "diff_size" : "4", // CS
-/// "diff_overall" : "6", // OD
-/// "diff_approach" : "7", // AR
-/// "diff_drain" : "6", // HP
-/// "hit_length" : "113", // 第一个note到最后一个note的间隔（不计算breaks）
-/// "source" : "BMS",
-/// // 0 = any, 1 = unspecified, 2 = video game, 3 = anime, 4 = rock, 5 = pop, 6 = other, 7 = novelty, 9 = hip hop, 10 = electronic (note that there's no 8)
-/// "genre_id" : "1",
-/// // 0 = any, 1 = other, 2 = english, 3 = japanese, 4 = chinese, 5 = instrumental, 6 = korean, 7 = french, 8 = german, 9 = swedish, 10 = spanish, 11 = italian
-/// "language_id" : "5",
-/// "title" : "High-Priestess", // 歌曲名称
-/// "total_length" : "145", // 第一个note到最后一个note的间隔（计算breaks）
-/// "version" : "Overkill", // 难度名
-/// "file_md5" : "c8f08438204abfcdd1a748ebfae67421", // 谱面文件（不知道是.osz还是.osu）的MD5哈希值
-/// "mode" : "0", // 模式,
-/// "tags" : "melodious long", // tags
-/// // 被收藏的次数。特别的，该条目采用英式英语，而不是美式英语（favorite_count）
-/// "favourite_count" : "121",
-/// "playcount" : "9001", // 被玩（。）的次数
-/// "passcount" : "1337", // 被pass的次数（玩家没有fail或者retry）
-/// "max_combo" : "2101" // 最大combo数
-/// }, { ... }, ...]
+///     {
+///         // 4 = loved, 3 = qualified, 2 = approved, 1 = ranked, 0 = pending, -1 = WIP, -2 = graveyard
+///         "approved" : "1",
+///          // ranked日期, 时区为UTC+8
+///         "approved_date" : "2013-07-02 01:01:12",
+///          // 最后更新日期，时区同上。 如果谱面被Unranked之后Reranked，该日期可能晚于上面的日期。
+///         "last_update" : "2013-07-06 16:51:22",
+///         "artist" : "Luxion",
+///         "beatmap_id" : "252002", // 每个难度的Beatmap_ID
+///         "beatmapset_id" : "93398", // 所有难度的BeatmapSet_ID
+///         "bpm" : "196",
+///         "creator" : "RikiH_",
+///         "difficultyrating" : "5.59516", // 游戏中和网站上的难度星数
+///         "diff_size" : "4", // CS
+///         "diff_overall" : "6", // OD
+///         "diff_approach" : "7", // AR
+///         "diff_drain" : "6", // HP
+///         "hit_length" : "113", // 第一个note到最后一个note的间隔（不计算breaks）
+///         "source" : "BMS",
+///         // 0 = any, 1 = unspecified, 2 = video game, 3 = anime, 4 = rock, 5 = pop, 6 = other, 7 = novelty, 9 = hip hop, 10 = electronic (note that there's no 8)
+///         "genre_id" : "1",
+///         // 0 = any, 1 = other, 2 = english, 3 = japanese, 4 = chinese, 5 = instrumental, 6 = korean, 7 = french, 8 = german, 9 = swedish, 10 = spanish, 11 = italian
+///         "language_id" : "5",
+///         "title" : "High-Priestess", // 歌曲名称
+///         "total_length" : "145", // 第一个note到最后一个note的间隔（计算breaks）
+///         "version" : "Overkill", // 难度名
+///         "file_md5" : "c8f08438204abfcdd1a748ebfae67421", // 谱面文件（不知道是.osz还是.osu）的MD5哈希值
+///         "mode" : "0", // 模式,
+///         "tags" : "melodious long", // tags
+///         // 被收藏的次数。特别的，该条目采用英式英语，而不是美式英语（favorite_count）
+///         "favourite_count" : "121",
+///         "playcount" : "9001", // 被玩（。）的次数
+///         "passcount" : "1337", // 被pass的次数（玩家没有fail或者retry）
+///         "max_combo" : "2101" // 最大combo数
+///     },
+/// { ... }, ...]
 ///
 /// ```
 #[derive(Debug, Clone,serde::Serialize,serde::Deserialize)]
@@ -90,30 +91,33 @@ pub struct Beatmap {
 ///
 /// 数据以下面结构体为准
 /// ```  json
-/// [{"user_id" : "1",
-///"username" : "User name",
-/// "count300" : "1337",
-/// "count100" : "123",
-/// "count50" : "69",
-/// "playcount" : "42", // 以上四条为所有Ranked，Approved，Loved谱面中的计数
-/// "ranked_score" : "666666", // 所有Ranked，Approved，Loved谱面中的最高分计数
-/// "total_score" : "999999998", // 所有Ranked，Approved，Loved谱面中所有成绩的总分。
-/// "pp_rank" : "2442",
-/// "level" : "50.5050",
-/// "pp_raw" : "3113", // 不活跃的玩家PP值是0，以将他们排除出PP榜单
-/// "accuracy" : "98.1234",
-/// "count_rank_ss": "54",
-/// "count_rank_s" : "81", // 获得的SS S A的数目
-/// "count_rank_a" : "862",
-/// "country" : "DE", // 使用ISO3166-1 alpha-2国家命名规范。 参考http://en.wikipedia.org/wiki/ISO_3166-1_alpha-2/wiki/ISO_3166-1_alpha-2
-/// "pp_country_rank":"1337", // 国内的PP排名
-/// "events" : [{ // 记录这个用户上传的成绩【但是实际应用并没有获取到】
-/// "display_html": "<img src='\/images\/A_small.png'\/>...",//评级对应的图片
-/// "beatmap_id": "222342",
-/// "beatmapset_id": "54851",
-/// "date": "2013-07-07 22:34:04",
-/// "epicfactor": "1" // 这个成绩有多么的“史诗级”，取值范围是1-32  貌似api里面已经没了
-/// }, { ... }, ...]
+/// [
+///     {
+///         "user_id" : "1",
+///         "username" : "User name",
+///         "count300" : "1337",
+///         "count100" : "123",
+///         "count50" : "69",
+///         "playcount" : "42", // 以上四条为所有Ranked，Approved，Loved谱面中的计数
+///         "ranked_score" : "666666", // 所有Ranked，Approved，Loved谱面中的最高分计数
+///         "total_score" : "999999998", // 所有Ranked，Approved，Loved谱面中所有成绩的总分。
+///         "pp_rank" : "2442",
+///         "level" : "50.5050",
+///         "pp_raw" : "3113", // 不活跃的玩家PP值是0，以将他们排除出PP榜单
+///         "accuracy" : "98.1234",
+///         "count_rank_ss": "54",
+///         "count_rank_s" : "81", // 获得的SS S A的数目
+///         "count_rank_a" : "862",
+///         "country" : "DE", // 使用ISO3166-1 alpha-2国家命名规范。 参考http://en.wikipedia.org/wiki/ISO_3166-1_alpha-2/wiki/ISO_3166-1_alpha-2
+///         "pp_country_rank":"1337", // 国内的PP排名
+///         "events" : [{ // 记录这个用户上传的成绩【但是实际应用并没有获取到】
+///         "display_html": "<img src='\/images\/A_small.png'\/>...",//评级对应的图片
+///         "beatmap_id": "222342",
+///         "beatmapset_id": "54851",
+///         "date": "2013-07-07 22:34:04",
+///         "epicfactor": "1" // 这个成绩有多么的“史诗级”，取值范围是1-32  貌似api里面已经没了
+///     },
+/// { ... }, ...]
 /// ```
 ///
 #[derive(Debug, Clone,serde::Serialize,serde::Deserialize)]
@@ -147,22 +151,24 @@ pub struct User {
 ///
 /// 数据以下面结构体为准
 /// ```  json
-/// [{"score" : "1234567",
-/// "username" : "User name",
-/// "count300" : "300",
-/// "count100" : "50",
-/// "count50" : "10",
-/// "countmiss" : "1",
-/// "maxcombo" : "321",
-/// "countkatu" : "10",
-/// "countgeki" : "50",
-/// "perfect" : "0", // 只有取得了地图的最大cb时，该值为1
-/// "enabled_mods" : "76", // 具体参见枚举
-/// "user_id" : "1",
-/// "date" : "2013-06-22 9:11:16",
-/// "rank" : "SH",
-/// "pp" : "1.3019" //4位小数
-/// },
+/// [
+///     {
+///         "score" : "1234567",
+///         "username" : "User name",
+///         "count300" : "300",
+///         "count100" : "50",
+///         "count50" : "10",
+///         "countmiss" : "1",
+///         "maxcombo" : "321",
+///         "countkatu" : "10",
+///         "countgeki" : "50",
+///         "perfect" : "0", // 只有取得了地图的最大cb时，该值为1
+///         "enabled_mods" : "76", // 具体参见枚举
+///         "user_id" : "1",
+///         "date" : "2013-06-22 9:11:16",
+///         "rank" : "SH",
+///         "pp" : "1.3019" //4位小数
+///     },
 ///
 /// {...},
 ///
@@ -189,6 +195,34 @@ pub struct Scores{
     pub pp :String,
     pub replay_available :String,
 }
+///  # best Bp + recent
+/// 引用: https://docs.osuwiki.cn/jin-jie-zhi-lu/wei-rao-osu-kaifa#5.1.4-wan-jia-de-bp
+///
+/// 数据以下面结构体为准
+/// ```  json
+/// [
+///     {
+///         "beatmap_id" : "222342",
+///         "score" : "1234567",
+///         "username" : "User name",
+///         "maxcombo" : "321",
+///         "count300" : "300",
+///         "count100" : "50",
+///         "count50" : "10",
+///         "countmiss" : "1",
+///         "countkatu" : "10",
+///         "countgeki" : "50",
+///         "perfect" : "0", //只有取得了地图的最大cb时，该值为1
+///         "enabled_mods" : "76", //具体参见前文枚举
+///         "user_id" : "1",
+///         "date" : "2013-06-22 9:11:16",
+///         "rank" : "SH",
+///         "pp" : "1.3019" //四位小数
+///     },
+/// { ... },
+/// ...]
+/// ```
+///
 #[derive(Debug, Clone,serde::Serialize,serde::Deserialize)]
 pub struct GameRecord {
     pub beatmap_id :String,
@@ -209,6 +243,46 @@ pub struct GameRecord {
     pub pp :String,
     pub replay_available :String,
 }
+///  # match
+/// 引用: https://docs.osuwiki.cn/jin-jie-zhi-lu/wei-rao-osu-kaifa#5.1.6-mp-fang-jian-xin-xi
+///
+/// 数据以下面结构体为准
+/// ``` json
+/// [
+///     {
+///         "match":{"match_id" : "1936471",
+///         "name" : "Marcin's game",
+///         "start_time" : "2013-10-06 03:34:54",
+///         "end_time" : null // 并不支持——永远是null },
+///         "games":[{
+///         "game_id" : "45668898",
+///         "start_time" : "2013-10-06 03:36:27",
+///         "end_time" : "2013-10-06 03:40:01",
+///         "beatmap_id" : "181717",
+///         "play_mode" : "0", // standard = 0, taiko = 1, ctb = 2, o!m = 3
+///         "match_type" : "0", // 并不支持
+///         "scoring_type" : "0", // 胜利条件：score = 0, accuracy = 1, combo = 2, score v2 = 3
+///         "team_type" : "0", // 比赛模式：Head to head = 0, Tag Co-op = 1, Team vs = 2, Tag Team vs = 3
+///         "mods" : "0", // 房间使用的Mod，参看前文
+///         "scores" : [{"slot" : "0", // 从0开始，按玩家所在的玩家位排列
+///         "team" : "0", // 未开启队伍模式则为0, 1为蓝队，2为红队
+///         "user_id" : "722665",
+///         "score" : "3415874",
+///         "maxcombo" : "411",
+///         "rank" : "0", //并不支持
+///         "count50" : "0",
+///         "count100" : "11",
+///         "count300" : "425",
+///         "countmiss" : "1",
+///         "countgeki" : "67",
+///         "countkatu" : "9",
+///         "perfect" : "0", //最大CB
+///         "pass" : "1" // 如果玩家在结尾失败了则为0，pass或者复活了则为1
+///     },
+/// { ... } ...] },
+/// { ... }, ...]
+/// }]
+/// ```
 #[derive(Debug, Clone,serde::Serialize,serde::Deserialize)]
 pub struct MatchRoom {
     #[serde(rename = "match")]
@@ -255,6 +329,16 @@ pub struct RoomScores {
     pub pass :String,
     pub enabled_mods :Option<String>,
 }
+///  # replay
+/// 引用: https://docs.osuwiki.cn/jin-jie-zhi-lu/wei-rao-osu-kaifa#5.1.7-huo-qu-hui-fang
+///
+/// 数据以下面结构体为准
+/// ``` json
+/// {
+///     "content":"喵喵喵(base64数据)",
+///     "encoding":"base64"
+/// }
+/// ```
 #[derive(Debug, Clone,serde::Serialize,serde::Deserialize)]
 pub struct Replay {
     pub content :String,
