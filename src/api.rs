@@ -2,7 +2,7 @@ use std::process::id;
 use reqwest::Client;
 use serde_json::{json, Value};
 use serde_json::error::Category::Data;
-use crate::entity::{Beatmap, GameRecord, Scores, User};
+use crate::entity::{Beatmap, GameRecord, Games, MatchRoom, Scores, User};
 /// 父url
 pub static OSU_API_1: &'static str = "https://osu.ppy.sh/api";
 pub static OSU_API_2: &'static str = "https://osu.ppy.sh/oauth/token";
@@ -375,15 +375,60 @@ impl ApiV1 {
         &self,
         user:UserType<'_>,
         mode:Option<i8>,
-    ) ->GameRecord {
+    ) -> GameRecord {
         let vec = self.get_user_recent_list(user, mode, Some(1)).await;
         vec[0].clone()
+    }
+    /// # /api/get_match
+    /// # MP房间信息
+    /// 返回一把mp的历史记录。
+    ///
+    /// # 参数：
+    /// * k - api key （必须）
+    /// * mp - 房间id（必须）【也就是官网MP Link的参数】
+    /// * 在房间中使用 !mp settings 获取match
+    ///
+    /// 例: https://osu.ppy.sh/community/matches/105537044
+    ///
+    ///                                             ^
+    ///
+    /// 返回值：包括房间信息和玩家成绩的JSON列表
+    /// # Example
+    /// ```
+    /// use osu_api_rs::api::{ApiV1, UserType};
+    ///
+    /// let api_v1 = ApiV1::new(format!("{}", API KEY));
+    /// let room = api_v1.get_match(Some(105537044)).await;
+    /// println!("{:?}", room);
+    /// ```
+    pub async fn get_match(
+        &self,
+        mp_id:Option<i64>,
+    ) -> MatchRoom {
+        let vec = vec![
+            ("mp", DataType::Int64(mp_id))
+        ];
+        let data = get_1(format!("/get_match?k={}{}", self.api_key,url(vec))).await;
+        data_serialize(data)
+    }
+    /// 获取mp最新的成绩
+    pub async fn get_match_recent_scores(
+        &self,
+        mp_id:Option<i64>,
+    ) -> Games {
+        let match_room = self.get_match(mp_id).await;
+        match_room.games.get(match_room.games.len() - 1).unwrap().clone()
     }
 
 }
 
 fn data_serialize_vec<ApiData :for<'a> serde::Deserialize<'a> + serde::Serialize>(data:String) -> Vec<ApiData> {
     let vec = serde_json::from_str::<Vec<ApiData>>(data.as_str()).unwrap();
+    vec
+}
+fn data_serialize<ApiData :for<'a> serde::Deserialize<'a> + serde::Serialize>(data:String) -> ApiData {
+
+    let vec = serde_json::from_str::<ApiData>(data.as_str()).unwrap();
     vec
 }
 
