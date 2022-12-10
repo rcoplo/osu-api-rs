@@ -1,23 +1,25 @@
-use std::process::id;
 use reqwest::Client;
 use serde_json::{json, Value};
 use serde_json::error::Category::Data;
-use crate::entity::{Beatmap, GameRecord, Games, MatchRoom, Replay, Scores, User};
+use crate::entity_v1::{Beatmap, GameRecord, Games, MatchRoom, Replay, Scores, User};
+use crate::util::{data_serialize, data_serialize_vec, DataType, UserType};
+
+
 /// 父url
 pub static OSU_API_1: &'static str = "https://osu.ppy.sh/api";
-pub static OSU_API_2: &'static str = "https://osu.ppy.sh/oauth/token";
-/// 获取数据 osu_api_v1 用的get
+/// reqwest
 async fn get(url: String) -> String {
-    let string = format!("{}{}", OSU_API_1, url);
-    let data = reqwest::get(string).await;
-    let response = data.unwrap();
-    response.text().await.unwrap_or(String::from(""))
-}
-/// 获取数据 osu_api_v2 用的post
-async fn post(url: &str,json:Value) -> String {
-    let data = reqwest::get(format!("{}{}",OSU_API_2,url)).await;
-    let response = data.unwrap();
-    response.text().await.unwrap_or(String::from(""))
+    let client = Client::new();
+    let res = client.get(format!("{}{}", OSU_API_1, url))
+        .header("Content-Type", "application/json")
+        .header("Accept", "application/json")
+        .send().await;
+    match res {
+        Ok(response) => {
+            response.text().await.unwrap_or(String::from(""))
+        }
+        Err(err) => {panic!("数据获取错误: {}", err)}
+    }
 }
 
 /// # ApiV1
@@ -34,13 +36,16 @@ pub struct ApiV1{
 impl ApiV1 {
     /// ```
     /// use osu_api_rs::api::ApiV1;
+    /// use osu_api_rs::ApiV1;
     ///
-    /// let api_v1 = ApiV1::new(format!("{}", API KEY));
+    /// let api_v1 = ApiV1::new(format!("{}", API_KEY));
+    /// // 或
+    /// let api_v1 = ApiV1::new(API_KEY);
     /// ```
 
-    pub fn new(api_key:String) -> ApiV1 {
+    pub fn new(api_key:impl Into<String>) -> ApiV1 {
         ApiV1{
-            api_key,
+            api_key:api_key.into(),
         }
     }
     /// # /api/get_beatmaps
@@ -62,7 +67,7 @@ impl ApiV1 {
     /// return ：一个包含所有符合指定条件的、ranked谱面的JSON列表。每个难度一个列表。
     /// # Example
     /// ```
-    /// use osu_api_rs::api::ApiV1;
+    /// use osu_api_rs::ApiV1;
     ///
     /// let api_v1 = ApiV1::new(format!("{}", API KEY));
     /// let beatmaps = api_v1.get_beatmaps(None,Some(3020923),None,None,true,None,None).await;
@@ -169,46 +174,39 @@ impl ApiV1 {
     /// 返回值： 包含用户信息的JSON列表。
     /// # Example
     /// ```
-    /// use osu_api_rs::api::{ApiV1, UserType};
+    /// use osu_api_rs::{ApiV1, UserType};
     ///
     /// let api_v1 = ApiV1::new(format!("{}", API KEY));
-    /// let user = api_v1.get_user(Some(UserType::USERID(18267600)), Some(3), None).await;
+    /// let user = api_v1.get_user(UserType::USERID(18267600), Some(3), None).await;
     /// println!("{:?}", user);
     /// ```
     pub async fn get_user(
         &self,
         // 指定userId或者userName
-        user:Option<UserType<'_>>,
+        user:UserType<'_>,
         // 游戏模式, (0 = osu!, 1 = Taiko, 2 = CtB, 3 = osu!mania)
         mode:Option<i8>,
         // 最后成绩的日期,默认 1
         event_days:Option<i8>
     ) -> User {
        let vec =  match user {
-            None => {
-                vec![]
-            }
-            Some(user) => {
-                match user {
-                    UserType::USERID(id) => {
-                        vec![
-                            ("u",DataType::Int64(Some(id))),
-                            ("m",DataType::Int8(mode)),
-                            ("type",DataType::String(Some("id"))),
-                            ("event_days",DataType::Int8(event_days)),
-                        ]
-                    }
-                    UserType::USERNAME(name) => {
-                        vec![
-                            ("u",DataType::String(Some(name))),
-                            ("m",DataType::Int8(mode)),
-                            ("type",DataType::String(Some("string"))),
-                            ("event_days",DataType::Int8(event_days)),
-                        ]
-                    }
-                }
-            }
-        };
+           UserType::USERID(id) => {
+               vec![
+                   ("u",DataType::Int64(Some(id))),
+                   ("m",DataType::Int8(mode)),
+                   ("type",DataType::String(Some("id"))),
+                   ("event_days",DataType::Int8(event_days)),
+               ]
+           }
+           UserType::USERNAME(name) => {
+               vec![
+                   ("u",DataType::String(Some(name))),
+                   ("m",DataType::Int8(mode)),
+                   ("type",DataType::String(Some("string"))),
+                   ("event_days",DataType::Int8(event_days)),
+               ]
+           }
+       };
         let data = get(format!("/get_user?k={}{}", self.api_key, url(vec))).await;
         let serialize_vec:Vec<User> = data_serialize_vec(data);
         serialize_vec[0].clone()
@@ -229,8 +227,9 @@ impl ApiV1 {
     ///
     /// 返回值：包含选定谱面前100分数信息的JSON列表。
     /// # Example
-    /// ```
-    /// use osu_api_rs::api::{ApiV1, UserType};
+    ///```
+    ///
+    /// use osu_api_rs::{ApiV1, UserType};
     ///
     /// let api_v1 = ApiV1::new(format!("{}", API KEY));
     /// let user = api_v1.get_scores(Some(992512),UserType::USERID(18267600),Some(3),Some(1)).await;
@@ -247,7 +246,7 @@ impl ApiV1 {
         // 获取数量
         limit:Option<i8>
     ) -> Vec<Scores> {
-        let mut vec =  match user {
+        let vec =  match user {
             UserType::USERID(id) => {
                 vec![
                     ("u", DataType::Int64(Some(id))),
@@ -292,8 +291,8 @@ impl ApiV1 {
     ///
     /// 返回值：包含了指定用户的BP前10的JSON列表。
     /// # Example
-    /// ```
-    /// use osu_api_rs::api::{ApiV1, UserType};
+    ///```
+    /// use osu_api_rs::{ApiV1, UserType};
     ///
     /// let api_v1 = ApiV1::new(format!("{}", API KEY));
     /// let bp_list = api_v1.get_user_bp_list(UserType::USERID(18267600),Some(3),Some(1)).await;
@@ -305,7 +304,7 @@ impl ApiV1 {
         mode:Option<i8>,
         limit:Option<i8>
     ) -> Vec<GameRecord>{
-        let mut vec =  match user {
+        let vec =  match user {
             UserType::USERID(id) => {
                 vec![
                     ("u", DataType::Int64(Some(id))),
@@ -349,7 +348,7 @@ impl ApiV1 {
         mode:Option<i8>,
         limit:Option<i8>
     ) -> Vec<GameRecord> {
-        let mut vec =  match user {
+        let vec =  match user {
             UserType::USERID(id) => {
                 vec![
                     ("u", DataType::Int64(Some(id))),
@@ -395,7 +394,7 @@ impl ApiV1 {
     /// 返回值：包括房间信息和玩家成绩的JSON列表
     /// # Example
     /// ```
-    /// use osu_api_rs::api::{ApiV1, UserType};
+    /// use osu_api_rs::{ApiV1, UserType};
     ///
     /// let api_v1 = ApiV1::new(format!("{}", API KEY));
     /// let room = api_v1.get_match(Some(105537044)).await;
@@ -417,7 +416,12 @@ impl ApiV1 {
         mp_id:Option<i64>,
     ) -> Games {
         let match_room = self.get_match(mp_id).await;
-        match_room.games.get(match_room.games.len() - 1).unwrap().clone()
+        let vec = &match_room.games;
+        return if match_room.games.len() != 0 {
+            vec[match_room.games.len() - 1].clone()
+        } else {
+            vec[0].clone()
+        }
     }
     /// # /api/get_replay
     /// # 获取回放
@@ -458,18 +462,7 @@ impl ApiV1 {
     }
 
 }
-
-fn data_serialize_vec<ApiData :for<'a> serde::Deserialize<'a> + serde::Serialize>(data:String) -> Vec<ApiData> {
-    let vec = serde_json::from_str::<Vec<ApiData>>(data.as_str()).unwrap();
-    vec
-}
-fn data_serialize<ApiData :for<'a> serde::Deserialize<'a> + serde::Serialize>(data:String) -> ApiData {
-
-    let vec = serde_json::from_str::<ApiData>(data.as_str()).unwrap();
-    vec
-}
-
-fn url(vec:Vec<(&str,DataType)>) -> String {
+pub fn url(vec:Vec<(&str,DataType)>) -> String {
     let mut string = String::new();
     for (k,v) in vec {
         match v {
@@ -498,30 +491,12 @@ fn url(vec:Vec<(&str,DataType)>) -> String {
                     string.push_str(format!("&{}={}",k,v).as_str());
                 }
             }
+            DataType::Vec(vec) => {
+                if let Some(vec) = vec{
+                    string.push_str(format!("&{}={:?}",k,vec).as_str());
+                }
+            }
         }
     }
     string
-}
-
-/// UserType 枚举
-pub enum UserType<'a> {
-    /// user id
-    ///
-    /// https://osu.ppy.sh/users/18267600
-    ///
-    ///                             ^
-    USERID(i64),
-    /// user name
-    /// <h3>osu 用户名</h3>
-    USERNAME(&'a str),
-}
-/// 提交的数据类型不一样怎么办?
-///
-/// 直接定义一个枚举(
-enum DataType<'a> {
-    Int64(Option<i64>),
-    Int32(Option<i32>),
-    Int16(Option<i16>),
-    Int8(Option<i8>),
-    String(Option<&'a str>),
 }
