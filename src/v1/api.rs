@@ -1,16 +1,15 @@
-use reqwest::Client;
-use serde_json::{json, Value};
-use serde_json::error::Category::Data;
+use reqwest::{Client, Url};
+use serde_json::json;
 use crate::entity_v1::{Beatmap, GameRecord, Games, MatchRoom, Replay, Scores, User};
-use crate::util::{data_serialize, data_serialize_vec, DataType, UserType};
+use crate::util::{assembly_data, assembly_user_type, data_serialize, data_serialize_vec, DataType, UserType};
 
 
 /// 父url
 pub static OSU_API_1: &'static str = "https://osu.ppy.sh/api";
 /// reqwest
-async fn get(url: String) -> String {
+async fn get(url: Url) -> String {
     let client = Client::new();
-    let res = client.get(format!("{}{}", OSU_API_1, url))
+    let res = client.get(url.to_string())
         .header("Content-Type", "application/json")
         .header("Accept", "application/json")
         .send().await;
@@ -79,7 +78,7 @@ impl ApiV1 {
         /*
          set_id 相当于谱的总id
          https://osu.ppy.sh/beatmapsets/1730502#mania/3536583
-                                 ^
+                                           ^
         */
         set_id:Option<i64>,
         /*
@@ -99,49 +98,27 @@ impl ApiV1 {
         // 返回的数量
         limit:Option<i16>,
     ) -> Vec<Beatmap> {
-       let mut vec =  match user {
-            None => {
-               vec![
-                    ("s", DataType::Int64(set_id)),
-                    ("b", DataType::Int64(beatmap_id)),
-                    ("m", DataType::Int8(mode)),
-                    ("h", DataType::String(hash)),
-                    ("limit", DataType::Int16(limit)),
-                ]
-            }
-            Some(user) => {
-                match user {
-                    UserType::USERID(id) => {
-                         vec![
-                            ("u", DataType::Int64(Some(id))),
-                            ("s", DataType::Int64(set_id)),
-                            ("b", DataType::Int64(beatmap_id)),
-                            ("m", DataType::Int8(mode)),
-                            ("type", DataType::String(Some("id"))),
-                            ("h", DataType::String(hash)),
-                            ("limit", DataType::Int16(limit)),
-                        ]
-                    }
-                    UserType::USERNAME(name) => {
-                        vec![
-                            ("u", DataType::String(Some(name))),
-                            ("s", DataType::Int64(set_id)),
-                            ("b", DataType::Int64(beatmap_id)),
-                            ("m", DataType::Int8(mode)),
-                            ("type",DataType::String(Some("string"))),
-                            ("h", DataType::String(hash)),
-                            ("limit", DataType::Int16(limit)),
-                        ]
-                    }
-                }
-            }
-        };
-        if transformation {
-            vec.push(("a", DataType::Int8(Some(1))));
-        } else {
-            vec.push(("a", DataType::Int8(Some(0))));
+        let mut vec  =  vec![];
+
+        assembly_data(&[
+            ("s", DataType::Int64(set_id)),
+            ("b", DataType::Int64(beatmap_id)),
+            ("m", DataType::Int8(mode)),
+            ("h", DataType::String(hash)),
+            ("limit", DataType::Int16(limit)),
+        ],&mut vec);
+
+        if let Some(user) = user {
+            assembly_user_type(user,&mut vec);
         }
-        let data = get(format!("/get_beatmaps?k={}{}", self.api_key, url(vec))).await;
+        if transformation {
+            vec.push(("a", "1".to_string()));
+        } else {
+            vec.push(("a","0".to_string()));
+        }
+        let url = self.assembly_url("get_beatmaps", vec);
+        let data = get(url).await;
+
         data_serialize_vec(data)
     }
     /// 使用 beatmap_id 获取铺面信息
@@ -189,25 +166,18 @@ impl ApiV1 {
         // 最后成绩的日期,默认 1
         event_days:Option<i8>
     ) -> User {
-       let vec =  match user {
-           UserType::USERID(id) => {
-               vec![
-                   ("u",DataType::Int64(Some(id))),
-                   ("m",DataType::Int8(mode)),
-                   ("type",DataType::String(Some("id"))),
-                   ("event_days",DataType::Int8(event_days)),
-               ]
-           }
-           UserType::USERNAME(name) => {
-               vec![
-                   ("u",DataType::String(Some(name))),
-                   ("m",DataType::Int8(mode)),
-                   ("type",DataType::String(Some("string"))),
-                   ("event_days",DataType::Int8(event_days)),
-               ]
-           }
-       };
-        let data = get(format!("/get_user?k={}{}", self.api_key, url(vec))).await;
+        let mut vec  =  vec![];
+
+        assembly_data(
+            &[
+                ("m",DataType::Int8(mode)),
+                ("event_days",DataType::Int8(event_days))
+            ], &mut vec);
+
+        assembly_user_type(user,&mut vec);
+
+        let url = self.assembly_url("get_user", vec);
+        let data = get(url).await;
         let serialize_vec:Vec<User> = data_serialize_vec(data);
         serialize_vec[0].clone()
     }
@@ -246,35 +216,21 @@ impl ApiV1 {
         // 获取数量
         limit:Option<i8>
     ) -> Vec<Scores> {
-        let vec =  match user {
-            UserType::USERID(id) => {
-                vec![
-                    ("u", DataType::Int64(Some(id))),
-                    ("b", DataType::Int64(beatmap_id)),
-                    ("m", DataType::Int8(mode)),
-                    ("type", DataType::String(Some("id"))),
-                    ("limit", DataType::Int8(limit)),
-                ]
-            }
-            UserType::USERNAME(name) => {
-                vec![
-                    ("u", DataType::String(Some(name))),
-                    ("b", DataType::Int64(beatmap_id)),
-                    ("m", DataType::Int8(mode)),
-                    ("type",DataType::String(Some("string"))),
-                    ("limit", DataType::Int8(limit)),
-                ]
-            }
-        };
-        let data = get(format!("/get_scores?k={}{}", self.api_key, url(vec))).await;
+        let mut vec  =  vec![];
+
+        assembly_data(&[
+            ("m",DataType::Int8(mode)),
+            ("limit",DataType::Int8(limit)),
+        ],&mut vec);
+
+        assembly_user_type(user,&mut vec);
+
+        let url = self.assembly_url("get_scores",vec);
+
+        let data = get(url).await;
         data_serialize_vec(data)
     }
-    pub async fn get_score(
-        &self,
-        beatmap_id: Option<i64>,
-        user:UserType<'_>,
-        mode:Option<i8>,
-    ) ->Scores {
+    pub async fn get_score(&self, beatmap_id: Option<i64>, user:UserType<'_>, mode:Option<i8>, ) ->Scores {
         let vec = self.get_scores(beatmap_id, user, mode, Some(1)).await;
         vec[0].clone()
     }
@@ -298,31 +254,18 @@ impl ApiV1 {
     /// let bp_list = api_v1.get_user_bp_list(UserType::USERID(18267600),Some(3),Some(1)).await;
     /// println!("{:?}", bp_list);
     /// ```
-    pub async fn get_user_bp_list(
-        &self,
-        user:UserType<'_>,
-        mode:Option<i8>,
-        limit:Option<i8>
-    ) -> Vec<GameRecord>{
-        let vec =  match user {
-            UserType::USERID(id) => {
-                vec![
-                    ("u", DataType::Int64(Some(id))),
-                    ("m", DataType::Int8(mode)),
-                    ("type", DataType::String(Some("id"))),
-                    ("limit", DataType::Int8(limit)),
-                ]
-            }
-            UserType::USERNAME(name) => {
-                vec![
-                    ("u", DataType::String(Some(name))),
-                    ("m", DataType::Int8(mode)),
-                    ("type",DataType::String(Some("string"))),
-                    ("limit", DataType::Int8(limit)),
-                ]
-            }
-        };
-        let data = get(format!("/get_user_best?k={}{}", self.api_key, url(vec))).await;
+    pub async fn get_user_bp_list(&self, user:UserType<'_>, mode:Option<i8>, limit:Option<i8>) -> Vec<GameRecord>{
+        let mut vec =  vec![];
+
+        assembly_data(&[
+            ("m",DataType::Int8(mode)),
+            ("limit",DataType::Int8(limit)),
+        ],&mut vec);
+
+        assembly_user_type(user,&mut vec);
+
+        let url = self.assembly_url("get_user_best",vec);
+        let data = get(url).await;
         data_serialize_vec(data)
     }
     /// 获取指定 Bp
@@ -342,31 +285,17 @@ impl ApiV1 {
     /// * 与获取BP一样，只不过limit的最大值是50。
     /// * 返回值：包含玩家最近10次游戏记录的JSON列表。
     /// * 字段与BP一致，不再赘述
-    pub async fn get_user_recent_list(
-        &self,
-        user:UserType<'_>,
-        mode:Option<i8>,
-        limit:Option<i8>
-    ) -> Vec<GameRecord> {
-        let vec =  match user {
-            UserType::USERID(id) => {
-                vec![
-                    ("u", DataType::Int64(Some(id))),
-                    ("m", DataType::Int8(mode)),
-                    ("type", DataType::String(Some("id"))),
-                    ("limit", DataType::Int8(limit)),
-                ]
-            }
-            UserType::USERNAME(name) => {
-                vec![
-                    ("u", DataType::String(Some(name))),
-                    ("m", DataType::Int8(mode)),
-                    ("type",DataType::String(Some("string"))),
-                    ("limit", DataType::Int8(limit)),
-                ]
-            }
-        };
-        let data = get(format!("/get_user_recent?k={}{}", self.api_key, url(vec))).await;
+    pub async fn get_user_recent_list(&self, user:UserType<'_>, mode:Option<i8>, limit:Option<i8>) -> Vec<GameRecord> {
+        let mut vec  =  vec![];
+        assembly_data(&[
+            ("m",DataType::Int8(mode)),
+            ("limit",DataType::Int8(limit)),
+        ],&mut vec);
+
+        assembly_user_type(user,&mut vec);
+
+        let url = self.assembly_url("get_user_recent",vec);
+        let data = get(url).await;
         data_serialize_vec(data)
     }
     /// 获取最新游戏记录,(包括失败)?
@@ -400,21 +329,20 @@ impl ApiV1 {
     /// let room = api_v1.get_match(Some(105537044)).await;
     /// println!("{:?}", room);
     /// ```
-    pub async fn get_match(
-        &self,
-        mp_id:Option<i64>,
-    ) -> MatchRoom {
-        let vec = vec![
+    pub async fn get_match(&self, mp_id:Option<i64>, ) -> MatchRoom {
+        let mut vec = vec![];
+
+        assembly_data(&[
             ("mp", DataType::Int64(mp_id))
-        ];
-        let data = get(format!("/get_match?k={}{}", self.api_key, url(vec))).await;
+        ],&mut vec);
+
+        let url = self.assembly_url("get_match", vec);
+
+        let data = get(url).await;
         data_serialize(data)
     }
     /// 获取mp最新的成绩
-    pub async fn get_match_recent_scores(
-        &self,
-        mp_id:Option<i64>,
-    ) -> Games {
+    pub async fn get_match_recent_scores(&self, mp_id:Option<i64>, ) -> Games {
         let match_room = self.get_match(mp_id).await;
         let vec = &match_room.games;
         return if match_room.games.len() != 0 {
@@ -439,64 +367,22 @@ impl ApiV1 {
         beatmap_id:Option<i64>,
         user:UserType<'_>,
     ) -> Replay {
-       let vec =  match user {
-            UserType::USERID(id) => {
-                vec![
-                    ("m",DataType::Int8(mode)),
-                    ("b",DataType::Int64(beatmap_id)),
-                    ("u",DataType::Int64(Some(id))),
-                    ("type",DataType::String(Some("id"))),
-                ]
-            }
-            UserType::USERNAME(name) => {
-                vec![
-                    ("m",DataType::Int8(mode)),
-                    ("b",DataType::Int64(beatmap_id)),
-                    ("u",DataType::String(Some(name))),
-                    ("type",DataType::String(Some("string"))),
-                ]
-            }
-        };
-        let data = get(format!("/get_replay?k={}{}", self.api_key, url(vec))).await;
+       let mut vec =  vec![];
+
+        assembly_data(&[
+            ("m",DataType::Int8(mode)),
+            ("b",DataType::Int64(beatmap_id)),
+        ],&mut vec);
+
+        assembly_user_type(user,&mut vec);
+
+        let url = self.assembly_url("get_replay", vec);
+
+        let data = get(url).await;
         data_serialize(data)
     }
-
-}
-pub fn url(vec:Vec<(&str,DataType)>) -> String {
-    let mut string = String::new();
-    for (k,v) in vec {
-        match v {
-            DataType::Int64(i) => {
-                if let Some(v) = i{
-                    string.push_str(format!("&{}={}",k,v).as_str());
-                }
-            }
-            DataType::Int32(i) => {
-                if let Some(v) = i{
-                    string.push_str(format!("&{}={}",k,v).as_str());
-                }
-            }
-            DataType::Int16(i) => {
-                if let Some(v) = i{
-                    string.push_str(format!("&{}={}",k,v).as_str());
-                }
-            }
-            DataType::Int8(i) => {
-                if let Some(v) = i{
-                    string.push_str(format!("&{}={}",k,v).as_str());
-                }
-            }
-            DataType::String(str) => {
-                if let Some(v) = str{
-                    string.push_str(format!("&{}={}",k,v).as_str());
-                }
-            }
-            DataType::Vec(vec) => {
-                if let Some(vec) = vec{
-                    string.push_str(format!("&{}={:?}",k,vec).as_str());
-                }
-            }
-        }
+    fn assembly_url<URL:AsRef<str> + std::fmt::Display>(&self, url: URL, vec:Vec<(&str,String)>) -> Url {
+        Url::parse_with_params(format!("{}/{}?k={}",OSU_API_1,<URL as Into<URL>>::into(url), self.api_key).as_str(),
+                                         &vec).unwrap()
     }
-    string
 }
