@@ -1,9 +1,10 @@
-use reqwest::{Client, Error, Response, Url};
+use std::collections::HashMap;
+use reqwest::{Client, Url};
 use reqwest::header::HeaderMap;
 use serde_json::{json, Value};
-use crate::entity_v2::{Beatmap, UserBeatmapScore};
-use crate::util::{assembly_data, data_serialize, data_serialize_vec, DataType};
-
+use crate::entity_v2::{Beatmap, BestBeatmapScores, UserBeatmapScore};
+use crate::util::{assembly_data, data_serialize, data_serialize_vec, DataType, Mode, Mods};
+use crate::error::{Error, Result};
 /// 父url
 pub static OSU_API_2: &'static str = "https://osu.ppy.sh/api/v2";
 /// 客户端凭据授予 (没有关联用户权限)
@@ -14,6 +15,21 @@ pub static OSU_API_2_OAUTH: &'static str = "https://osu.ppy.sh/oauth/token";
 async fn get(url: Url,access_token:&String) -> String {
     let client = Client::new();
     let res = client.get(url.to_string())
+        .header("Content-Type", "application/json")
+        .header("Accept", "application/json")
+        .header("Authorization", format!("Bearer {}",access_token))
+        .send().await;
+    match res {
+        Ok(response) => {
+            response.text().await.unwrap_or(String::from(""))
+        }
+        Err(err) => {panic!("数据获取错误: {}", err)}
+    }
+}
+async fn post(url: Url,map:Value,access_token:&String) -> String {
+    let client = Client::new();
+    let res = client.post(url.to_string())
+        .json(&map)
         .header("Content-Type", "application/json")
         .header("Accept", "application/json")
         .header("Authorization", format!("Bearer {}",access_token))
@@ -94,10 +110,7 @@ impl ApiV2 {
     /// * checksum   - 可选  beatmap 的校验?
     /// * filename  - 可选  要查找的文件名。
     /// * id  - 可选   要查找的 beatmap ID。
-    ///
-    ///
-    ///
-    pub async fn lookup_beatmap_all(&self, checksum:Option<&str>, filename:Option<&str>, beatmap_id:Option<i64>) -> Beatmap  {
+    pub async fn lookup_beatmap_all(&self, checksum:Option<&str>, filename:Option<&str>, beatmap_id:Option<i64>) -> Result<Beatmap>  {
         let mut vec = vec![];
         assembly_data(&[
             ("id",DataType::Int64(beatmap_id)),
@@ -109,34 +122,94 @@ impl ApiV2 {
         data_serialize(data)
     }
     /// 通过 beatmap ID 查找
-    pub async fn lookup_beatmap(&self, beatmap_id:i64) -> Beatmap  {
+    pub async fn lookup_beatmap(&self, beatmap_id:i64) -> Result<Beatmap>  {
         self.lookup_beatmap_all(None,None,Some(beatmap_id)).await
     }
     /// # 获取用户Beatmap分数
     /// ## URL Parameters
     /// * beatmap_id - beatmap ID (铺面的一个难度的id)
-    ///
     /// * user_id - user id (用户id)
     ///
     /// ## Query Parameters
     ///
     /// * mode - 可选 (游戏模式:  fruits , mania , osu , taiko )
+    /// * mods - 可选 (匹配Mod的数组 [["DT","MR"]] )
     ///
-    ///  * mods - 可选 (匹配Mod的数组 [["DT","MR"]] )
     ///
-    pub async fn get_user_beatmap_score_all(&self, beatmap_id:i64,user_id:i64,mode:Option<&str>,mods:Option<Vec<&str>>) -> UserBeatmapScore  {
+    /// return : UserBeatmapScore
+    pub async fn get_user_beatmap_score_complete(&self, beatmap_id:i64,user_id:i64,mode:Option<Mode>,mods:Option<Vec<Mods>>) -> Result<UserBeatmapScore>  {
         let mut vec = vec![];
+
         assembly_data(&[
-            ("mode",DataType::String(mode)),
-            ("mods",DataType::Vec(mods)),
+            ("mode",DataType::Mode(mode,true)),
+            ("mods",DataType::Mods(mods)),
         ],&mut vec);
-        let url = self.assembly_url(format!("beatmaps/{}/scores/users/{}",beatmap_id,user_id), vec);
+
+        let url = self.assembly_url(
+            format!("beatmaps/{}/scores/users/{}",beatmap_id,user_id),
+            vec);
+        println!("{:?}", &url.to_string());
         let data = get(url, &self.access_token).await;
         data_serialize(data)
     }
     /// 通过 beatmap_id  /  user_id 获取用户Beatmap分数
-    pub async fn get_user_beatmap_score(&self, beatmap_id:i64,user_id:i64) -> UserBeatmapScore  {
-        self.get_user_beatmap_score_all(beatmap_id,user_id,None,None).await
+    pub async fn get_user_beatmap_score(&self, beatmap_id:i64,user_id:i64) -> Result<UserBeatmapScore>  {
+        self.get_user_beatmap_score_complete(beatmap_id,user_id,None,None).await
+    }
+    /// # 获取用户Beatmap全部分数
+    /// ## URL Parameters
+    /// * beatmap_id - beatmap ID (铺面的一个难度的id)
+    /// * user_id - user id (用户id)
+    ///
+    /// ## Query Parameters
+    ///
+    /// * mode - 可选 (游戏模式:  fruits , mania , osu , taiko )
+    /// * mods - 可选 (匹配Mod的数组 [["DT","MR"]] )
+    ///
+    /// return : Vec\<UserBeatmapScore\>
+    pub async fn get_user_beatmap_scores_complete_all(&self, beatmap_id:i64,user_id:i64,mode:Option<Mode>,mods:Option<Vec<Mods>>) -> Result<Vec<UserBeatmapScore>>  {
+        let mut vec = vec![];
+
+        assembly_data(&[
+            ("mode",DataType::Mode(mode,true)),
+            ("mods",DataType::Mods(mods)),
+        ],&mut vec);
+
+        let url = self.assembly_url(
+            format!("beatmaps/{}/scores/users/{}/all",beatmap_id,user_id),
+            vec);
+        let data = get(url, &self.access_token).await;
+        data_serialize_vec(data)
+    }
+    /// 通过 beatmap_id  /  user_id 获取用户Beatmap全部分数
+    pub async fn get_user_beatmap_scores_all(&self, beatmap_id:i64,user_id:i64) -> Result<Vec<UserBeatmapScore>>  {
+        self.get_user_beatmap_scores_complete_all(beatmap_id,user_id,None,None).await
+    }
+    /// # 返回beatmap的最高得分
+    /// ## URL Parameters
+    /// * beatmap_id - beatmap ID (铺面的一个难度的id)
+    ///
+    /// ## Query Parameters
+    ///
+    /// * mode - 可选 (游戏模式:  fruits , mania , osu , taiko )
+    /// * mods - 可选 (匹配Mod的数组 [["DT","MR"]] )
+    /// * type - 可选 (Beatmap得分排名类型)
+    ///
+    /// return : BestBeatmapScores
+    pub async fn get_beatmap_score(&self, beatmap_id:i64,mode:Option<Mode>,mods:Option<Vec<Mods>>,beatmap_type:Option<&str>) -> Result<BestBeatmapScores>{
+        let mut vec = vec![];
+
+        assembly_data(&[
+            ("mode",DataType::Mode(mode,false)),
+            ("mods",DataType::Mods(mods)),
+            ("type",DataType::String(beatmap_type)),
+        ],&mut vec);
+
+        let url = self.assembly_url(
+            format!("beatmaps/{}/scores",beatmap_id),
+            vec);
+        let data = get(url, &self.access_token).await;
+        data_serialize(data)
     }
 
     fn assembly_url<URL:AsRef<str> + std::fmt::Display>(&self, url: URL, vec:Vec<(&str,String)>) -> Url {

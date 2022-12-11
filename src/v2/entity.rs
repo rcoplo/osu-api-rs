@@ -3,6 +3,7 @@
 //! 数据就不详细说明了,自己看看文档吧~
 
 use serde_json::Value;
+use crate::entity_v1::Scores;
 
 #[derive(Debug, Clone,serde::Serialize,serde::Deserialize)]
 pub struct Beatmap {
@@ -113,6 +114,7 @@ pub struct UserBeatmapScore {
     pub score:Score,
 
 }
+
 #[derive(Debug, Clone,serde::Serialize,serde::Deserialize)]
 pub struct Score {
     pub accuracy:f64,
@@ -137,11 +139,7 @@ pub struct Score {
     pub user:User,
 }
 
-#[derive(Debug, Clone,serde::Serialize,serde::Deserialize)]
-pub struct Cover{
-    pub url:String,
-    pub id:String,
-}
+
 
 #[derive(Debug, Clone,serde::Serialize,serde::Deserialize)]
 pub struct ScoreBeatmap {
@@ -199,8 +197,45 @@ pub struct User {
     pub country:Country,
     pub cover:Cover,
 
-}#[derive(Debug, Clone,serde::Serialize,serde::Deserialize)]
+}
+
+#[derive(Debug, Clone,serde::Serialize,serde::Deserialize)]
 pub struct Country {
     pub code:String,
     pub name:String,
 }
+
+#[derive(Debug, Clone,serde::Serialize,serde::Deserialize)]
+pub struct Cover{
+    pub url:String,
+    pub id:String,
+}
+
+#[derive(Debug, Clone,serde::Serialize,serde::Deserialize)]
+pub struct BestBeatmapScores {
+    pub scores:Vec<BestScores>,
+}
+
+#[derive(Debug, Clone,serde::Serialize,serde::Deserialize)]
+pub struct BestScores {
+    pub accuracy:f64,
+    pub best_id:i64,
+    pub created_at:String,
+    pub id:i64,
+    pub max_combo:i32,
+    pub mode:String,
+    pub mode_int:i32,
+    pub mods:Vec<String>,
+    pub passed:bool,
+    pub perfect:bool,
+    pub pp:f32,
+    pub rank:String,
+    pub replay:bool,
+    pub score:i32,
+    pub statistics:Statistics,
+    pub r#type:String,
+    pub user_id:i64,
+    pub current_user_attributes:Value,
+    pub user:User,
+}
+

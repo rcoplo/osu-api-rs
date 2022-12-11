@@ -4,7 +4,7 @@
 
 osu-api-v1 100%? (若有遗漏可以pr~)
 
-osu-api-v2 0% (不使用oauth,直接临时)
+osu-api-v2 10% (不使用oauth,直接临时)
 
 私服 api 0% (这里使用sb服的api)
 

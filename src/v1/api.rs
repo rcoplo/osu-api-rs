@@ -1,8 +1,8 @@
 use reqwest::{Client, Url};
 use serde_json::json;
 use crate::entity_v1::{Beatmap, GameRecord, Games, MatchRoom, Replay, Scores, User};
-use crate::util::{assembly_data, assembly_user_type, data_serialize, data_serialize_vec, DataType, UserType};
-
+use crate::util::{assembly_data, assembly_user_type, data_serialize, data_serialize_vec, DataType, Mode, UserType};
+use crate::error::{Error, Result};
 
 /// 父url
 pub static OSU_API_1: &'static str = "https://osu.ppy.sh/api";
@@ -69,7 +69,7 @@ impl ApiV1 {
     /// use osu_api_rs::ApiV1;
     ///
     /// let api_v1 = ApiV1::new(format!("{}", API KEY));
-    /// let beatmaps = api_v1.get_beatmaps(None,Some(3020923),None,None,true,None,None).await;
+    /// let beatmaps = api_v1.get_beatmaps(None,Some(3020923),None,None,true,None,None).await.unwrap();
     /// println!("{:?}", beatmaps);
     /// ```
 
@@ -90,20 +90,20 @@ impl ApiV1 {
         // 指定userId或者userName
         user:Option<UserType<'_>>,
         // 游戏模式, (0 = osu!, 1 = Taiko, 2 = CtB, 3 = osu!mania)
-        mode:Option<i8>,
+        mode:Option<Mode>,
         // 是否为转谱
         transformation:bool,
         // hash值 上面有说明
         hash:Option<&str>,
         // 返回的数量
         limit:Option<i16>,
-    ) -> Vec<Beatmap> {
+    ) -> Result<Vec<Beatmap>> {
         let mut vec  =  vec![];
 
         assembly_data(&[
             ("s", DataType::Int64(set_id)),
             ("b", DataType::Int64(beatmap_id)),
-            ("m", DataType::Int8(mode)),
+            ("m", DataType::Mode(mode,false)),
             ("h", DataType::String(hash)),
             ("limit", DataType::Int16(limit)),
         ],&mut vec);
@@ -119,23 +119,30 @@ impl ApiV1 {
         let url = self.assembly_url("get_beatmaps", vec);
         let data = get(url).await;
 
-        data_serialize_vec(data)
+        data_serialize_vec::<Beatmap>(data)
     }
     /// 使用 beatmap_id 获取铺面信息
-    pub async fn get_beatmap(&self, beatmap_id:Option<i64>,) -> Beatmap {
+    pub async fn get_beatmap(&self, beatmap_id:Option<i64>,) -> Result<Beatmap> {
         let vec = self.get_beatmaps(None, beatmap_id, None, None, true, None, Some(1)).await;
-        vec[0].clone()
+        match vec {
+            Err(err) => Err(err),
+            Ok(data) => Ok(data[0].clone())
+        }
     }
 
     /// 使用 set_id 获取铺面信息
-    pub async fn get_beatmap_set_id(&self, set_id:Option<i64>,) -> Vec<Beatmap> {
+    pub async fn get_beatmap_set_id(&self, set_id:Option<i64>,) -> Result<Vec<Beatmap>> {
         let vec = self.get_beatmaps(set_id, None, None, None, true, None, None).await;
         vec
     }
-     /// 使用 beatmap_id / user 获取铺面信息
-    pub async fn get_beatmap_user(&self, beatmap_id:Option<i64>, user_type:Option<UserType<'_>>) -> Beatmap{
+
+    /// 使用 beatmap_id / user 获取铺面信息
+    pub async fn get_beatmap_user(&self, beatmap_id:Option<i64>, user_type:Option<UserType<'_>>) -> Result<Beatmap>{
         let vec = self.get_beatmaps(None, beatmap_id, user_type, None, true, None, Some(1)).await;
-        vec[0].clone()
+        match vec {
+            Err(err) => Err(err),
+            Ok(data) => Ok(data[0].clone())
+        }
     }
     /// # /api/get_user
     /// 玩家信息
@@ -162,15 +169,15 @@ impl ApiV1 {
         // 指定userId或者userName
         user:UserType<'_>,
         // 游戏模式, (0 = osu!, 1 = Taiko, 2 = CtB, 3 = osu!mania)
-        mode:Option<i8>,
+        mode:Option<Mode>,
         // 最后成绩的日期,默认 1
         event_days:Option<i8>
-    ) -> User {
+    ) -> Result<User> {
         let mut vec  =  vec![];
 
         assembly_data(
             &[
-                ("m",DataType::Int8(mode)),
+                ("m",DataType::Mode(mode,false)),
                 ("event_days",DataType::Int8(event_days))
             ], &mut vec);
 
@@ -178,8 +185,11 @@ impl ApiV1 {
 
         let url = self.assembly_url("get_user", vec);
         let data = get(url).await;
-        let serialize_vec:Vec<User> = data_serialize_vec(data);
-        serialize_vec[0].clone()
+        let serialize_vec= data_serialize_vec::<User>(data);
+        match serialize_vec {
+            Err(err) => Err(err),
+            Ok(data) => Ok(data[0].clone())
+        }
     }
 
     /// # /api/get_scores
@@ -212,14 +222,14 @@ impl ApiV1 {
         // 指定userId 或者 userName
         user:UserType<'_>,
         // 游戏模式, (0 = osu!, 1 = Taiko, 2 = CtB, 3 = osu!mania)
-        mode:Option<i8>,
+        mode:Option<Mode>,
         // 获取数量
         limit:Option<i8>
-    ) -> Vec<Scores> {
+    ) -> Result<Vec<Scores>> {
         let mut vec  =  vec![];
 
         assembly_data(&[
-            ("m",DataType::Int8(mode)),
+            ("m",DataType::Mode(mode,false)),
             ("limit",DataType::Int8(limit)),
         ],&mut vec);
 
@@ -228,11 +238,14 @@ impl ApiV1 {
         let url = self.assembly_url("get_scores",vec);
 
         let data = get(url).await;
-        data_serialize_vec(data)
+        data_serialize_vec::<Scores>(data)
     }
-    pub async fn get_score(&self, beatmap_id: Option<i64>, user:UserType<'_>, mode:Option<i8>, ) ->Scores {
+    pub async fn get_score(&self, beatmap_id: Option<i64>, user:UserType<'_>, mode:Option<Mode>, ) ->Result<Scores> {
         let vec = self.get_scores(beatmap_id, user, mode, Some(1)).await;
-        vec[0].clone()
+        match vec {
+            Err(err) => Err(err),
+            Ok(data) => Ok(data[0].clone())
+        }
     }
     /// # /api/get_user_best
     /// # 玩家的BP
@@ -254,11 +267,11 @@ impl ApiV1 {
     /// let bp_list = api_v1.get_user_bp_list(UserType::USERID(18267600),Some(3),Some(1)).await;
     /// println!("{:?}", bp_list);
     /// ```
-    pub async fn get_user_bp_list(&self, user:UserType<'_>, mode:Option<i8>, limit:Option<i8>) -> Vec<GameRecord>{
+    pub async fn get_user_bp_list(&self, user:UserType<'_>, mode:Option<Mode>, limit:Option<i8>) -> Result<Vec<GameRecord>>{
         let mut vec =  vec![];
 
         assembly_data(&[
-            ("m",DataType::Int8(mode)),
+            ("m",DataType::Mode(mode,false)),
             ("limit",DataType::Int8(limit)),
         ],&mut vec);
 
@@ -266,17 +279,21 @@ impl ApiV1 {
 
         let url = self.assembly_url("get_user_best",vec);
         let data = get(url).await;
-        data_serialize_vec(data)
+        data_serialize_vec::<GameRecord>(data)
     }
     /// 获取指定 Bp
     pub async fn get_user_bp(
         &self,
         user:UserType<'_>,
-        mode:Option<i8>,
+        mode:Option<Mode>,
         num:i8
-    ) -> GameRecord {
+    ) -> Result<GameRecord> {
         let vec = self.get_user_bp_list(user, mode, Some(num)).await;
-        vec[num as usize - 1].clone()
+        match vec {
+            Err(err) => Err(err),
+            Ok(data) => Ok(data[0].clone())
+        }
+
     }
     /// # /api/get_user_recent
     /// # 玩家最近的游戏记录
@@ -285,10 +302,10 @@ impl ApiV1 {
     /// * 与获取BP一样，只不过limit的最大值是50。
     /// * 返回值：包含玩家最近10次游戏记录的JSON列表。
     /// * 字段与BP一致，不再赘述
-    pub async fn get_user_recent_list(&self, user:UserType<'_>, mode:Option<i8>, limit:Option<i8>) -> Vec<GameRecord> {
+    pub async fn get_user_recent_list(&self, user:UserType<'_>, mode:Option<Mode>, limit:Option<i8>) -> Result<Vec<GameRecord>> {
         let mut vec  =  vec![];
         assembly_data(&[
-            ("m",DataType::Int8(mode)),
+            ("m",DataType::Mode(mode,false)),
             ("limit",DataType::Int8(limit)),
         ],&mut vec);
 
@@ -296,16 +313,19 @@ impl ApiV1 {
 
         let url = self.assembly_url("get_user_recent",vec);
         let data = get(url).await;
-        data_serialize_vec(data)
+        data_serialize_vec::<GameRecord>(data)
     }
     /// 获取最新游戏记录,(包括失败)?
     pub async fn get_user_recent(
         &self,
         user:UserType<'_>,
-        mode:Option<i8>,
-    ) -> GameRecord {
+        mode:Option<Mode>,
+    ) -> Result<GameRecord> {
         let vec = self.get_user_recent_list(user, mode, Some(1)).await;
-        vec[0].clone()
+        match vec {
+            Err(err) => Err(err),
+            Ok(data) => Ok(data[0].clone())
+        }
     }
     /// # /api/get_match
     /// # MP房间信息
@@ -329,7 +349,7 @@ impl ApiV1 {
     /// let room = api_v1.get_match(Some(105537044)).await;
     /// println!("{:?}", room);
     /// ```
-    pub async fn get_match(&self, mp_id:Option<i64>, ) -> MatchRoom {
+    pub async fn get_match(&self, mp_id:Option<i64>, ) -> Result<MatchRoom> {
         let mut vec = vec![];
 
         assembly_data(&[
@@ -342,14 +362,22 @@ impl ApiV1 {
         data_serialize(data)
     }
     /// 获取mp最新的成绩
-    pub async fn get_match_recent_scores(&self, mp_id:Option<i64>, ) -> Games {
+    pub async fn get_match_recent_scores(&self, mp_id:Option<i64>, ) -> Result<Games> {
         let match_room = self.get_match(mp_id).await;
-        let vec = &match_room.games;
-        return if match_room.games.len() != 0 {
-            vec[match_room.games.len() - 1].clone()
-        } else {
-            vec[0].clone()
+        match match_room {
+            Err(err) => Err(err),
+            Ok(data) => {
+                let vec = &data.games;
+                return if data.games.len() >= 1 {
+                    Ok(vec[data.games.len() - 1].clone())
+                } else if data.games.len() == 0{
+                    Err(Error::Null)
+                }else {
+                    Ok(vec[0].clone())
+                }
+            }
         }
+
     }
     /// # /api/get_replay
     /// # 获取回放
@@ -363,14 +391,14 @@ impl ApiV1 {
     /// 返回值：一个包含"content"值的JSON列表，该值中含有base-64加密的rep。
     pub async fn get_replay(
         &self,
-        mode:Option<i8>,
+        mode:Option<Mode>,
         beatmap_id:Option<i64>,
         user:UserType<'_>,
-    ) -> Replay {
+    ) -> Result<Replay> {
        let mut vec =  vec![];
 
         assembly_data(&[
-            ("m",DataType::Int8(mode)),
+            ("m",DataType::Mode(mode,false)),
             ("b",DataType::Int64(beatmap_id)),
         ],&mut vec);
 
